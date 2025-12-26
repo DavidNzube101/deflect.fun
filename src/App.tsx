@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import logo from './logo.svg';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -10,7 +11,7 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 const API_BASE = 'https://adona.onrender.com';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
-type Screen = 'loading' | 'home' | 'game' | 'store' | 'leaderboard' | 'pvp';
+type Screen = 'loading' | 'home' | 'game' | 'store' | 'leaderboard' | 'pvp' | 'credits';
 
 interface Threat {
   id: number;
@@ -701,6 +702,9 @@ const DeflectGame: React.FC = () => {
              }}>
                LEADERBOARD
              </button>
+            <button style={{ ...styles.homeButton, ...styles.secondaryButton }} onClick={() => setScreen('credits')}>
+              CREDITS
+            </button>
             
             {userData && userData.highScore > 0 && (
               <div style={styles.statsCard}>
@@ -1080,6 +1084,28 @@ const DeflectGame: React.FC = () => {
     </div>
   );
 
+  const renderCredits = () => (
+    <div style={styles.creditsScreen}>
+      <button style={styles.backButton} onClick={() => setScreen('home')}>← BACK</button>
+      <div style={styles.glassCard}>
+        <h2 style={styles.sectionTitle}>CREDITS</h2>
+        <div style={styles.creditsContent}>
+          <p><strong>Author:</strong> Skipp (David Nzube)</p>
+          <p><strong>Design Artist:</strong> Demi</p>
+          <div style={styles.openSourceSection}>
+            <h3>Open Source</h3>
+            <p>
+              The code for this project is available on GitHub.
+            </p>
+            <a href="https://github.com/DavidNzube101/deflect.fun" target="_blank" rel="noopener noreferrer" style={{color: '#00f0ff'}}>
+              https://github.com/DavidNzube101/deflect.fun
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const truncateAddress = (addr: string) => {
     return addr.slice(0, 4) + '...' + addr.slice(-4);
   };
@@ -1155,6 +1181,7 @@ const DeflectGame: React.FC = () => {
       {screen === 'game' && renderGame()}
       {screen === 'store' && renderStore()}
       {screen === 'leaderboard' && renderLeaderboard()}
+      {screen === 'credits' && renderCredits()}
       {renderItemDetails()}
       {renderNotification()}
     </div>
@@ -1631,6 +1658,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 'bold',
     cursor: 'pointer',
     textTransform: 'uppercase'
+  },
+  creditsScreen: {
+    width: '100%',
+    height: '100%',
+    overflow: 'auto',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  creditsContent: {
+    padding: '20px',
+    textAlign: 'center',
+    color: 'white'
+  },
+  openSourceSection: {
+    marginTop: '30px',
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+    paddingTop: '20px'
   },
   leaderboardScreen: {
     width: '100%',
