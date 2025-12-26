@@ -95,11 +95,18 @@ const DeflectGame: React.FC = () => {
   
   // Leaderboard
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   
+  // PVP
+  const [pvpSocket, setPvpSocket] = useState<WebSocket | null>(null);
+  const [pvpState, setPvpState] = useState<any>(null);
+
   // UI
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [realityWarpMode, setRealityWarpMode] = useState(false);
   const [characterPosition, setCharacterPosition] = useState({ x: 50, y: 50 });
+  const [timeRemaining, setTimeRemaining] = useState('');
+  const [isAirdropModalOpen, setIsAirdropModalOpen] = useState(false);
   
   // Refs
   const gameLoopRef = useRef<number | undefined>(undefined);
@@ -114,12 +121,95 @@ const DeflectGame: React.FC = () => {
   const absorbActiveRef = useRef(false);
   const reviveTimeRef = useRef(0);
 
-  // Load assets on mount
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = `
+      @keyframes pulse {
+        0%, 100% { transform: translate(-50%, -50%) scale(1); }
+        50% { transform: translate(-50%, -50%) scale(1.1); }
+      }
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes jitter {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(1px, -1px); }
+        50% { transform: translate(-1px, 1px); }
+        75% { transform: translate(1px, 1px); }
+      }
+    `;
+    document.head.appendChild(styleSheet);
+
+    const targetDate = new Date('2026-01-25T00:00:00Z').getTime();
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      setTimeRemaining(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (screen === 'pvp' && publicKey && !pvpSocket) {
+      const ws = new WebSocket(`wss://adona.onrender.com/ws/pvp/${publicKey.toString()}`);
+
+      ws.onopen = () => {
+        console.log('PVP WebSocket connection established.');
+        showNotification('Connecting to PvP...', 'info');
+        ws.send(JSON.stringify({ type: 'join_queue' }));
+        setPvpSocket(ws);
+      };
+
+      ws.onmessage = (event) => {
+        console.log('Received PvP data:', event.data);
+        const data = JSON.parse(event.data);
+        setPvpState(data);
+
+        if (data.type === 'threat_spawn') {
+          setThreats(prev => [...prev, { ...data.threat, progress: 0 }]);
+        }
+        if (data.type === 'score_update') {
+          console.log('Score Update:', data);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('PVP WebSocket error:', error);
+        showNotification('PVP connection error.', 'error');
+        setScreen('home');
+      };
+
+      ws.onclose = (event) => {
+        console.log('PVP WebSocket connection closed.', event);
+        showNotification('Disconnected from PvP.', 'info');
+        setPvpSocket(null);
+        setPvpState(null);
+        setScreen('home');
+      };
+    }
+
+    return () => {
+      if (pvpSocket && screen !== 'pvp') {
+        pvpSocket.close();
+      }
+    };
+  }, [screen, publicKey, pvpSocket]);
+
   useEffect(() => {
     loadAllAssets();
   }, []);
 
-  // Fetch user data when wallet connects
   useEffect(() => {
     if (publicKey) {
       fetchUserData();
@@ -131,7 +221,6 @@ const DeflectGame: React.FC = () => {
     try {
       setLoadingProgress(10);
       
-      // Fetch characters and powerups data
       const [charsRes, powerupsRes] = await Promise.all([
         fetch(`${API_BASE}/api/characters`),
         fetch(`${API_BASE}/api/powerups`)
@@ -144,7 +233,6 @@ const DeflectGame: React.FC = () => {
       setAllPowerups(pows);
       setLoadingProgress(30);
       
-      // Preload character images
       const charImages: { [key: string]: string } = {};
       const charKeys = Object.keys(chars);
       for (let i = 0; i < charKeys.length; i++) {
@@ -157,7 +245,6 @@ const DeflectGame: React.FC = () => {
         setLoadingProgress(30 + (i / charKeys.length) * 30);
       }
       
-      // Preload powerup icons
       const powImages: { [key: string]: string } = {};
       const powKeys = Object.keys(pows);
       for (let i = 0; i < powKeys.length; i++) {
@@ -170,7 +257,6 @@ const DeflectGame: React.FC = () => {
         setLoadingProgress(60 + (i / powKeys.length) * 20);
       }
       
-      // Preload audio
       const audioFiles: { [key: string]: HTMLAudioElement } = {};
       const audioNames = ['lose-soundtrack.mp3', 'upgrade-soundtrack.mp3', 'win-soundtrack.mp3'];
       for (let i = 0; i < audioNames.length; i++) {
@@ -220,12 +306,15 @@ const DeflectGame: React.FC = () => {
   };
 
   const fetchLeaderboard = async () => {
+    setLeaderboardLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/leaderboard`);
       const data = await res.json();
       setLeaderboard(data.leaderboard);
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
+    } finally {
+      setLeaderboardLoading(false);
     }
   };
 
@@ -236,19 +325,16 @@ const DeflectGame: React.FC = () => {
     const native = selectedCharacter.powerups.map(id => allPowerups[id]).filter(Boolean);
     const purchased = userData.purchasedPowerups.map(id => allPowerups[id]).filter(Boolean);
     
-    // 1 native powerup
     if (native.length > 0) {
       const randomNative = native[Math.floor(Math.random() * native.length)];
       available.push({ ...randomNative });
     }
     
-    // 2 random from purchased
     const shuffled = [...purchased].sort(() => Math.random() - 0.5);
     for (let i = 0; i < Math.min(2, shuffled.length); i++) {
       available.push({ ...shuffled[i] });
     }
     
-    // Initialize powerups
     available.forEach(p => {
       p.active = false;
       if (p.id === 'god_revive') p.usesLeft = 3;
@@ -274,7 +360,6 @@ const DeflectGame: React.FC = () => {
     setCurrentPowerup(updated);
     setActivePowerups(prev => prev.map(p => p.id === powerup.id ? updated : p));
     
-    // Apply powerup effects
     if (powerup.id === 'reality_warp') {
       setRealityWarpMode(true);
     } else if (powerup.id === 'shadow_clone') {
@@ -287,7 +372,6 @@ const DeflectGame: React.FC = () => {
       godReviveUsesRef.current = 999;
     }
     
-    // Border glow effect
     document.body.style.boxShadow = `inset 0 0 100px ${powerup.accentColor}`;
     setTimeout(() => {
       document.body.style.boxShadow = '';
@@ -332,7 +416,6 @@ const DeflectGame: React.FC = () => {
   };
 
   const gameOver = async () => {
-    // Check for revives
     const godRevive = activePowerups.find(p => (p.id === 'god_revive' || p.id === 'infinite') && p.usesLeft && p.usesLeft > 0);
     if (godRevive) {
       const newUses = (godRevive.usesLeft || 0) - 1;
@@ -374,7 +457,7 @@ const DeflectGame: React.FC = () => {
       await fetch(`${API_BASE}/api/leaderboard/score?wallet=${publicKey.toString()}&score=${score}&character=${selectedCharacter.id}`, {
         method: 'POST'
       });
-      await fetchUserData(); // Refresh stats
+      await fetchUserData();
       showNotification('Score saved!', 'success');
     } catch (error) {
       console.error('Failed to submit score:', error);
@@ -402,7 +485,6 @@ const DeflectGame: React.FC = () => {
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, 'confirmed');
       
-      // Submit purchase to backend
       await fetch(`${API_BASE}/api/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -447,6 +529,11 @@ const DeflectGame: React.FC = () => {
   };
 
   const deflect = (direction: Direction) => {
+    if (screen === 'pvp' && pvpSocket) {
+      pvpSocket.send(JSON.stringify({ type: 'action', payload: { direction } }));
+      return;
+    }
+
     if (gameState !== 'playing' || realityWarpMode) return;
 
     const threat = threats.find(t => t.direction === direction && t.progress > 0.6);
@@ -454,7 +541,6 @@ const DeflectGame: React.FC = () => {
     if (threat) {
       const isPerfect = threat.progress > 0.85;
       
-      // Check for absorb powerup
       const absorb = activePowerups.find(p => p.id === 'absorb' && p.active);
       let points = isPerfect ? 15 : 10;
       if (absorb) {
@@ -518,16 +604,14 @@ const DeflectGame: React.FC = () => {
     vibrate(30);
   };
 
-  // Game loop
   useEffect(() => {
     if (screen !== 'game' || gameState !== 'playing') return;
 
     const loop = () => {
       const now = performance.now();
-      const delta = (now - lastUpdateRef.current) / 1000; // seconds
+      const delta = (now - lastUpdateRef.current) / 1000;
       lastUpdateRef.current = now;
       
-      // Spawn threats
       const interval = Math.max(800, 1500 - waveRef.current * 50);
       if (now - lastSpawnRef.current > interval) {
         const directions: Direction[] = ['up', 'down', 'left', 'right'];
@@ -543,11 +627,8 @@ const DeflectGame: React.FC = () => {
         waveRef.current++;
       }
 
-      // Update threats
       setThreats(prev => {
         const speed = slowMo ? 0.005 : 0.015;
-
-        // Check intangibility
         const intangible = activePowerups.find(p => p.id === 'intangibility' && p.active);
         const invincible = intangible || absorbActiveRef.current || realityWarpMode || (reviveTimeRef.current > 0 && now < reviveTimeRef.current);
 
@@ -578,7 +659,6 @@ const DeflectGame: React.FC = () => {
         return updated.filter(t => t.progress < 1);
       });
 
-      // Update particles
       setParticles(prev => {
         return prev
           .map(p => ({
@@ -590,7 +670,6 @@ const DeflectGame: React.FC = () => {
           .filter(p => p.life > 0);
       });
       
-      // Update powerup timers
       setActivePowerups(prev => prev.map(p => {
         if (p.active && p.timeLeft && p.timeLeft > 0) {
           const newTime = p.timeLeft - delta;
@@ -612,7 +691,6 @@ const DeflectGame: React.FC = () => {
     };
   }, [screen, gameState, slowMo, activePowerups, realityWarpMode]);
 
-  // Touch/keyboard handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
@@ -653,7 +731,6 @@ const DeflectGame: React.FC = () => {
         deflect(direction);
       }
       
-      // Powerup activation
       if (e.key === '1' && activePowerups[0] && !activePowerups[0].active) {
         activatePowerup(activePowerups[0]);
       } else if (e.key === '2' && activePowerups[1] && !activePowerups[1].active) {
@@ -667,7 +744,6 @@ const DeflectGame: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [screen, gameState, activePowerups, deflect]);
 
-  // Render functions
   const renderLoading = () => (
     <div style={styles.loadingScreen}>
       <img src={`${API_BASE}/assets/images/logo.png`} alt="deflect.fun" style={styles.loadingLogo} />
@@ -690,21 +766,20 @@ const DeflectGame: React.FC = () => {
         
         {publicKey && (
           <>
-            <button style={styles.homeButton} onClick={startGame}>
-              PLAY SOLO
-            </button>
-            <button style={{ ...styles.homeButton, ...styles.secondaryButton }} onClick={() => setScreen('store')}>
-              STORE
-            </button>
-             <button style={{ ...styles.homeButton, ...styles.secondaryButton }} onClick={() => {
-               setScreen('leaderboard');
-               fetchLeaderboard();
-             }}>
-               LEADERBOARD
-             </button>
-            <button style={{ ...styles.homeButton, ...styles.secondaryButton }} onClick={() => setScreen('credits')}>
-              CREDITS
-            </button>
+            <div style={styles.buttonContainer}>
+              <div style={styles.buttonRow}>
+                <button style={{...styles.homeButton, flex: 1}} onClick={startGame}>PLAY SOLO</button>
+                <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => setScreen('pvp')}>PLAY PVP</button>
+              </div>
+              <button style={{...styles.homeButton, ...styles.secondaryButton, width: '100%'}} onClick={() => setScreen('store')}>STORE</button>
+              <div style={styles.buttonRow}>
+                <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => {
+                  fetchLeaderboard();
+                  setScreen('leaderboard');
+                }}>LEADERBOARD</button>
+                <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => setScreen('credits')}>CREDITS</button>
+              </div>
+            </div>
             
             {userData && userData.highScore > 0 && (
               <div style={styles.statsCard}>
@@ -718,6 +793,14 @@ const DeflectGame: React.FC = () => {
         {!publicKey && (
           <p style={styles.connectPrompt}>Connect wallet to play</p>
         )}
+
+        <div style={styles.countdownSection}>
+          <h3 style={styles.countdownTitle}>Season 1 Ends In:</h3>
+          <p style={styles.countdownTimer}>{timeRemaining}</p>
+          <button style={styles.learnMoreButton} onClick={() => setIsAirdropModalOpen(true)}>
+            Learn More
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -735,7 +818,6 @@ const DeflectGame: React.FC = () => {
           onTouchEnd={handleTouchEnd}
           onClick={handleScreenTap}
         >
-          {/* Character */}
           <div style={{
             ...styles.player,
             left: `${characterPosition.x}%`,
@@ -758,7 +840,6 @@ const DeflectGame: React.FC = () => {
             }} />
           )}
 
-          {/* Threats */}
           {threats.map(threat => {
             const positions = {
               up: { top: `${threat.progress * 50}%`, left: '50%' },
@@ -780,7 +861,6 @@ const DeflectGame: React.FC = () => {
             );
           })}
 
-          {/* Particles */}
           {particles.map(p => (
             <div
               key={p.id}
@@ -798,7 +878,6 @@ const DeflectGame: React.FC = () => {
             />
           ))}
 
-          {/* Direction indicators */}
           <div style={{ ...styles.arrow, top: '5%', left: '50%', transform: 'translate(-50%, 0) rotate(180deg)' }}>▲</div>
           <div style={{ ...styles.arrow, bottom: '5%', left: '50%', transform: 'translate(-50%, 0)' }}>▲</div>
           <div style={{ ...styles.arrow, left: '5%', top: '50%', transform: 'translate(0, -50%) rotate(-90deg)' }}>▲</div>
@@ -822,7 +901,6 @@ const DeflectGame: React.FC = () => {
           )}
         </div>
 
-        {/* HUD */}
         <div style={styles.hud}>
           <div style={styles.score}>
             <div style={styles.scoreLabel}>SCORE</div>
@@ -838,7 +916,6 @@ const DeflectGame: React.FC = () => {
             </div>
           )}
           
-          {/* Powerup timer */}
           {currentPowerup && currentPowerup.timeLeft && currentPowerup.timeLeft > 0 && (
             <div style={styles.powerupTimer}>
               {currentPowerup.name}: {Math.ceil(currentPowerup.timeLeft)}s
@@ -846,7 +923,6 @@ const DeflectGame: React.FC = () => {
           )}
         </div>
 
-        {/* Powerup buttons */}
         <div style={styles.powerupContainer}>
           {activePowerups.map((p, i) => (
             <button
@@ -870,7 +946,6 @@ const DeflectGame: React.FC = () => {
           ))}
         </div>
 
-        {/* Game Over */}
         {gameState === 'gameover' && (
           <div style={styles.overlay}>
             <div style={styles.glassCard}>
@@ -934,7 +1009,6 @@ const DeflectGame: React.FC = () => {
                 </div>
               )}
 
-              {/* Action Button inside Drawer */}
               {userData && (
                 (() => {
                   const owned = isCharacter 
@@ -966,7 +1040,7 @@ const DeflectGame: React.FC = () => {
                         purchaseItem(viewingItem.id, viewingItemType!, viewingItem.price);
                         setViewingItem(null);
                       }}
-                      disabled={viewingItem.price === 0 && !owned} // Disable if free but logic handled elsewhere usually
+                      disabled={viewingItem.price === 0 && !owned}
                     >
                       {viewingItem.price === 0 ? 'CLAIM' : 'BUY NOW'}
                     </button>
@@ -1095,11 +1169,8 @@ const DeflectGame: React.FC = () => {
           <div style={styles.openSourceSection}>
             <h3>Open Source</h3>
             <p>
-              The code for this project is available on GitHub.
+              The code for this project is available on <a href="https://github.com/DavidNzube101/deflect.fun" target="_blank" rel="noopener noreferrer" style={{color: '#00f0ff'}}>GitHub</a>.
             </p>
-            <a href="https://github.com/DavidNzube101/deflect.fun" target="_blank" rel="noopener noreferrer" style={{color: '#00f0ff'}}>
-              https://github.com/DavidNzube101/deflect.fun
-            </a>
           </div>
         </div>
       </div>
@@ -1118,7 +1189,12 @@ const DeflectGame: React.FC = () => {
         <h2 style={styles.sectionTitle}>LEADERBOARD</h2>
 
         <div style={styles.leaderboardList}>
-          {leaderboard.length === 0 ? (
+          {leaderboardLoading ? (
+            <div style={styles.waitingContainer}>
+              <div style={styles.spinner}></div>
+              <p>Loading...</p>
+            </div>
+          ) : leaderboard.length === 0 ? (
             <p style={styles.emptyText}>No users yet</p>
           ) : (
             leaderboard.map((entry, i) => (
@@ -1153,7 +1229,76 @@ const DeflectGame: React.FC = () => {
     </div>
   );
 
-  // Notification drawer
+  const renderPvp = () => {
+    if (!pvpState) {
+      return (
+        <div style={styles.pvpScreen}>
+          <div style={styles.glassCard}>
+            <h2 style={styles.sectionTitle}>PVP MATCH</h2>
+            <div style={styles.waitingContainer}>
+              <p>Connecting...</p>
+              <div style={styles.spinner}></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (pvpState.type === 'game_start' || pvpState.status === 'waiting') {
+      return (
+        <div style={styles.pvpScreen}>
+          <div style={styles.glassCard}>
+            <h2 style={styles.sectionTitle}>PVP MATCH</h2>
+            <div style={styles.waitingContainer}>
+              <p>Waiting for an opponent...</p>
+              <div style={styles.spinner}></div>
+              <button style={{...styles.homeButton, ...styles.secondaryButton, marginTop: 20}} onClick={() => setScreen('home')}>
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (pvpState.type === 'game_end' || pvpState.status === 'gameover') {
+      return (
+        <div style={styles.overlay}>
+          <div style={styles.glassCard}>
+            <h2 style={styles.gameOverTitle}>{pvpState.winner === publicKey!.toString() ? 'YOU WIN!' : 'YOU LOSE'}</h2>
+            <p style={{textAlign: 'center', color: 'white'}}>Your Score: {pvpState.player1Score}</p>
+            <p style={{textAlign: 'center', color: 'white'}}>Opponent Score: {pvpState.player2Score}</p>
+            <button style={styles.homeButton} onClick={() => setScreen('home')}>
+              BACK TO HOME
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    return renderGame();
+  };
+
+  const renderAirdropModal = () => (
+    <div style={styles.overlay} onClick={() => setIsAirdropModalOpen(false)}>
+      <div style={{...styles.glassCard, maxWidth: '600px'}} onClick={e => e.stopPropagation()}>
+        <h2 style={styles.sectionTitle}>SEASON 1 AIRDROP</h2>
+        <p style={{color: 'white', textAlign: 'center'}}>
+          Airdrops will be distributed to all active players at the end of the season. The top 15 players on the leaderboard will receive a larger share!
+        </p>
+        <p style={{color: 'white', textAlign: 'center', marginTop: '10px'}}>
+          Snapshots are taken on the <strong>25th of every month at 15:00 UTC</strong>.
+        </p>
+        <p style={{color: 'white', textAlign: 'center', marginTop: '20px', fontWeight: 'bold'}}>
+          Keep deflecting and climb the leaderboard!
+        </p>
+        <button style={{...styles.homeButton, marginTop: '20px'}} onClick={() => setIsAirdropModalOpen(false)}>
+          CLOSE
+        </button>
+      </div>
+    </div>
+  );
+
   const renderNotification = () => {
     if (!notification) return null;
     
@@ -1182,7 +1327,9 @@ const DeflectGame: React.FC = () => {
       {screen === 'store' && renderStore()}
       {screen === 'leaderboard' && renderLeaderboard()}
       {screen === 'credits' && renderCredits()}
+      {screen === 'pvp' && renderPvp()}
       {renderItemDetails()}
+      {isAirdropModalOpen && renderAirdropModal()}
       {renderNotification()}
     </div>
   );
@@ -1193,11 +1340,10 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100vw',
     height: '100vh',
     backgroundColor: '#0a0e27',
-    overflow: 'hidden',
+    overflow: 'auto',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     position: 'relative'
   },
-  // ... (keep existing styles until storeGrid)
   loadingScreen: {
     width: '100%',
     height: '100%',
@@ -1230,7 +1376,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   homeScreen: {
     width: '100%',
-    height: '100%',
+    minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1240,39 +1386,54 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255, 255, 255, 0.05)',
     backdropFilter: 'blur(10px)',
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '40px',
+    padding: '30px',
     maxWidth: '500px',
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px'
+    gap: '15px'
   },
   homeTitle: {
     fontSize: '48px',
     color: '#00f0ff',
     margin: 0,
     textAlign: 'center',
-    textShadow: '0 0 20px #00f0ff'
+    textShadow: '0 0 20px #00f0ff',
+    animation: 'jitter 0.1s infinite'
   },
   homeSubtitle: {
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
-    margin: 0
+    margin: 0,
+    marginBottom: '15px'
   },
   walletContainer: {
     display: 'flex',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    marginBottom: '5px'
+  },
+  buttonContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    width: '100%'
+  },
+  buttonRow: {
+    display: 'flex',
+    gap: '10px',
+    width: '100%'
   },
   homeButton: {
-    padding: '15px 40px',
-    fontSize: '18px',
+    padding: '15px 20px',
+    fontSize: '16px',
     fontWeight: 'bold',
     backgroundColor: '#00f0ff',
     color: '#0a0e27',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    flex: 1,
   },
   secondaryButton: {
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -1289,11 +1450,37 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-around',
     color: 'white',
-    fontSize: '14px'
+    fontSize: '14px',
+    marginTop: '5px'
   },
   statValue: {
     color: '#00f0ff',
     fontWeight: 'bold'
+  },
+  countdownSection: {
+    marginTop: '20px',
+    paddingTop: '20px',
+    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+    textAlign: 'center',
+    color: 'white',
+  },
+  countdownTitle: {
+    fontSize: '16px',
+    color: '#00f0ff',
+    marginBottom: '10px'
+  },
+  countdownTimer: {
+    fontSize: '22px',
+    fontWeight: 'bold',
+    marginBottom: '15px'
+  },
+  learnMoreButton: {
+    padding: '8px 16px',
+    backgroundColor: 'transparent',
+    color: '#00f0ff',
+    border: '1px solid #00f0ff',
+    cursor: 'pointer',
+    fontSize: '14px'
   },
   gameContainer: {
     width: '100%',
@@ -1516,7 +1703,6 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     margin: 0
   },
-  // Replaced storeGrid with storeGrid2Col
   storeGrid2Col: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
@@ -1532,13 +1718,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   characterPreview: {
     width: '100%',
-    height: '100px', // Slightly smaller for 2-col
+    height: '100px',
     backgroundSize: 'cover',
     backgroundPosition: 'center'
   },
   powerupPreview: {
     width: '100%',
-    height: '100px', // Slightly smaller
+    height: '100px',
     backgroundSize: 'contain',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
@@ -1578,7 +1764,6 @@ const styles: Record<string, React.CSSProperties> = {
   selectedButton: {
     backgroundColor: '#00ff00'
   },
-  // Details Drawer Styles
   detailsOverlay: {
     position: 'fixed',
     top: 0,
@@ -1783,10 +1968,34 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 'bold',
     zIndex: 1000,
     textAlign: 'center'
-  }
+  },
+  pvpScreen: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px'
+  },
+  waitingContainer: {
+    textAlign: 'center',
+    color: 'white',
+    fontSize: '18px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px'
+  },
+  spinner: {
+    border: '4px solid rgba(255, 255, 255, 0.3)',
+    borderTop: '4px solid #00f0ff',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  },
 };
 
-// Wallet wrapper
 const DeflectApp: React.FC = () => {
   const network = WalletAdapterNetwork.Devnet;
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
