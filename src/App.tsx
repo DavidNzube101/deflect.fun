@@ -7,7 +7,7 @@ import { clusterApiUrl, Connection, PublicKey, Transaction, SystemProgram, LAMPO
 import confetti from 'canvas-confetti';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://adona.onrender.com';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 type Screen = 'loading' | 'home' | 'game' | 'store' | 'leaderboard' | 'pvp';
