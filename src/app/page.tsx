@@ -802,6 +802,7 @@ const DeflectGame: React.FC = () => {
   // PVP
   const [pvpSocket, setPvpSocket] = useState<WebSocket | null>(null);
   const [pvpState, setPvpState] = useState<any>(null);
+  const [opponentScore, setOpponentScore] = useState(0);
 
   // UI
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -901,6 +902,14 @@ const DeflectGame: React.FC = () => {
         const data = JSON.parse(event.data);
         setPvpState(data);
 
+        if (data.type === 'game_start') {
+          setScore(0);
+          setOpponentScore(0);
+          setThreats([]);
+          setGameState('playing');
+          showNotification('Match Started!', 'success');
+        }
+
         if (data.type === 'threat_spawn') {
           const colors = ['#ff006e', '#00f0ff', '#ffd700', '#ff4d00', '#00ff00', '#b829ff'];
           const shapes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon'] as const;
@@ -911,8 +920,19 @@ const DeflectGame: React.FC = () => {
             shape: shapes[Math.floor(Math.random() * shapes.length)]
           }]);
         }
+
         if (data.type === 'score_update') {
-          console.log('Score Update:', data);
+          // Identify which score is mine
+          if (publicKey) {
+            const myWallet = publicKey.toString();
+            if (data.player1 === myWallet) {
+              setScore(data.player1Score);
+              setOpponentScore(data.player2Score);
+            } else {
+              setScore(data.player2Score);
+              setOpponentScore(data.player1Score);
+            }
+          }
         }
       };
 
@@ -1270,6 +1290,7 @@ const DeflectGame: React.FC = () => {
       
       const threat = threats.find(t => t.direction === direction && t.progress > 0.6);
       if (threat) {
+        setScore(prev => prev + 10); // Optimistic score increase
         setThreats(prev => prev.filter(t => t.id !== threat.id));
         setShake(5);
         setTimeout(() => setShake(0), 100);
@@ -1696,8 +1717,8 @@ const DeflectGame: React.FC = () => {
             <div style={styles.scoreValue}>{score}</div>
           </div>
           <div style={styles.highScore}>
-            <div style={styles.scoreLabel}>HIGH</div>
-            <div style={styles.scoreValue}>{userData?.highScore || 0}</div>
+            <div style={styles.scoreLabel}>{screen === 'pvp' ? 'OPPONENT' : 'HIGH'}</div>
+            <div style={styles.scoreValue}>{screen === 'pvp' ? opponentScore : (userData?.highScore || 0)}</div>
           </div>
           {combo > 0 && (
             <div style={styles.combo}>
@@ -2114,12 +2135,16 @@ const DeflectGame: React.FC = () => {
     }
 
     if (pvpState.type === 'game_end' || pvpState.status === 'gameover') {
+      const isPlayer1 = pvpState.player1 === publicKey?.toString();
+      const myScore = isPlayer1 ? pvpState.player1Score : pvpState.player2Score;
+      const oppScore = isPlayer1 ? pvpState.player2Score : pvpState.player1Score;
+
       return (
         <div style={styles.overlay}>
           <div style={styles.glassCard}>
             <h2 style={styles.gameOverTitle}>{pvpState.winner === publicKey!.toString() ? 'YOU WIN!' : 'YOU LOSE'}</h2>
-            <p style={{textAlign: 'center', color: 'white'}}>Your Score: {pvpState.player1Score}</p>
-            <p style={{textAlign: 'center', color: 'white'}}>Opponent Score: {pvpState.player2Score}</p>
+            <p style={{textAlign: 'center', color: 'white'}}>Your Score: {myScore}</p>
+            <p style={{textAlign: 'center', color: 'white'}}>Opponent Score: {oppScore}</p>
             <button style={styles.homeButton} onClick={() => setScreen('home')}>
               BACK TO HOME
             </button>
