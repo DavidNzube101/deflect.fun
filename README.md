@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# deflect.fun
 
-## Getting Started
+A high-octane, cyberpunk hypercasual game built for the Scrolly x Superteam UK Game Jam. Survive the neon onslaught, collect powerups, and dominate the global leaderboard.
 
-First, run the development server:
+## 🎮 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Hypercasual Core:** Addictive "swipe-to-deflect" gameplay optimized for mobile.
+- **Cyberpunk Aesthetic:** Neon visuals, dynamic particles, screen shake, and reactive UI.
+- **Solana Integration:** Connect Phantom/Solflare to buy characters and powerups with DEVNET SOL.
+- **RPG Elements:** 
+  - **Store:** Unlock 8+ characters and 6 unique powerups (Time Dilation, Reality Warp, etc.).
+  - **Progression:** Persistent high scores and purchase history.
+- **Social & Competitive:**
+  - **Global Leaderboard:** Real-time ranking with "Season 1" countdown.
+  - **PVP Mode:** Real-time multiplayer duels (WebSocket).
+  - **Shareable:** Optimized for the "Scrolly feed" experience.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend:** Next.js 16 (React 19), Tailwind CSS, Canvas Confetti.
+- **Blockchain:** `@solana/web3.js`, Solana Wallet Adapter.
+- **Backend:** Go/Python (Firebase Firestore & Realtime Database).
+- **Design:** Custom "Glassmorphism" UI with responsive layouts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🕹️ How to Play
 
-## Learn More
+1. **Connect Wallet:** Use Phantom or Solflare (Devnet).
+2. **Survive:** Swipe (Mobile) or use Arrow Keys (Desktop) to deflect incoming threats.
+   - **Perfect Deflect:** Wait until the last second for a score multiplier!
+3. **Power Up:** Use earned points or SOL to buy items in the Store.
+4. **Climb:** Reach the top 15 for Season 1 Airdrop rewards.
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Getting Started
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. `pnpm install`
+2. `pnpm dev`
+3. Open `http://localhost:3000`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Built by Skipp (David Nzube) & Demi for Scrolly x Superteam UK.*
