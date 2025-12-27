@@ -73,6 +73,20 @@ interface AssetCache {
   audio: { [key: string]: HTMLAudioElement };
 }
 
+interface PvpState {
+  type?: 'game_start' | 'game_end' | 'threat_spawn' | 'score_update' | 'opponent_disconnected';
+  status?: 'waiting' | 'gameover' | string;
+  gameId?: string;
+  opponent?: string;
+  yourPosition?: string;
+  player1?: string;
+  player2?: string;
+  player1Score?: number;
+  player2Score?: number;
+  winner?: string;
+  threat?: any;
+}
+
 // --- Styles Object ---
 
 const styles: Record<string, React.CSSProperties> = {
@@ -801,7 +815,7 @@ const DeflectGame: React.FC = () => {
   
   // PVP
   const [pvpSocket, setPvpSocket] = useState<WebSocket | null>(null);
-  const [pvpState, setPvpState] = useState<any>(null);
+  const [pvpState, setPvpState] = useState<PvpState | null>(null);
   const [opponentScore, setOpponentScore] = useState(0);
 
   // UI
@@ -937,14 +951,7 @@ const DeflectGame: React.FC = () => {
 
         if (data.type === 'opponent_disconnected') {
           showNotification('Opponent disconnected! You win!', 'success');
-          // Optionally set state to gameover if the server doesn't send a game_end
-          // But usually server sends game_end with winner. 
-          // If not, we force a return to home after a delay or show a specific screen.
-          // For now, let's assume we just notify and maybe go home or wait for game_end.
-          // Actually, let's force a "Opponent Left" screen if we don't get a game_end.
-          // But reusing game_end logic is better if the server sends it.
-          // If the server just sends this, we can treat it as a win.
-          setPvpState(prev => ({ ...prev, type: 'game_end', winner: publicKey?.toString() }));
+          setPvpState((prev: PvpState | null) => ({ ...prev, type: 'game_end', winner: publicKey?.toString() }));
         }
       };
 
