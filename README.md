@@ -30,11 +30,11 @@ A high-octane, cyberpunk hypercasual game built for the Scrolly x Superteam UK G
 3. **Power Up:** Use earned points or SOL to buy items in the Store.
 4. **Climb:** Reach the top 15 for Season 1 Airdrop rewards.
 
-## 🚀 Getting Started
+## 🌐 Play Live
 
-1. `pnpm install`
-2. `pnpm dev`
-3. Open `http://localhost:3000`
+Experience the game now:
+- [deflectfun.vercel.app](https://deflectfun.vercel.app)
+- [deflectfun.xyz](https://deflectfun.xyz)
 
 ---
 *Built by Skipp (David Nzube) & Demi for Scrolly x Superteam UK.*
