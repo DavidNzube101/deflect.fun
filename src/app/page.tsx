@@ -1267,6 +1267,23 @@ const DeflectGame: React.FC = () => {
   const deflect = (direction: Direction) => {
     if (screen === 'pvp' && pvpSocket) {
       pvpSocket.send(JSON.stringify({ type: 'action', payload: { direction } }));
+      
+      const threat = threats.find(t => t.direction === direction && t.progress > 0.6);
+      if (threat) {
+        setThreats(prev => prev.filter(t => t.id !== threat.id));
+        setShake(5);
+        setTimeout(() => setShake(0), 100);
+        vibrate(30);
+        
+        const positions = {
+          up: { x: 50, y: 20 },
+          down: { x: 50, y: 80 },
+          left: { x: 20, y: 50 },
+          right: { x: 80, y: 50 }
+        };
+        const pos = positions[direction];
+        createParticles(pos.x, pos.y, threat.color);
+      }
       return;
     }
 
@@ -1342,7 +1359,7 @@ const DeflectGame: React.FC = () => {
 
   // Game Loop
   useEffect(() => {
-    if (screen !== 'game' || gameState !== 'playing') return;
+    if ((screen !== 'game' && screen !== 'pvp') || gameState !== 'playing') return;
 
     const loop = () => {
       const now = performance.now();
@@ -1350,7 +1367,7 @@ const DeflectGame: React.FC = () => {
       lastUpdateRef.current = now;
       
       const interval = Math.max(800, 1500 - waveRef.current * 50);
-      if (now - lastSpawnRef.current > interval) {
+      if (screen === 'game' && now - lastSpawnRef.current > interval) {
         const directions: Direction[] = ['up', 'down', 'left', 'right'];
         const direction = directions[Math.floor(Math.random() * directions.length)];
         
@@ -1396,7 +1413,9 @@ const DeflectGame: React.FC = () => {
             deactivatePowerup('shadow_clone');
             return updated.filter(t => t.id !== missed.id);
           } else {
-            gameOver();
+            if (screen === 'game') {
+              gameOver();
+            }
             return updated.filter(t => t.id !== missed.id);
           }
         }
