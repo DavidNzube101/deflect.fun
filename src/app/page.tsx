@@ -22,6 +22,8 @@ interface Threat {
   id: number;
   direction: Direction;
   progress: number;
+  color: string;
+  shape: 'circle' | 'square' | 'triangle' | 'pentagon' | 'hexagon' | 'octagon';
 }
 
 interface Particle {
@@ -129,7 +131,17 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px'
+    gap: '15px',
+    position: 'relative'
+  },
+  cornerBracket: {
+    position: 'absolute',
+    width: '20px',
+    height: '20px',
+    borderColor: '#00f0ff',
+    borderStyle: 'solid',
+    borderWidth: '0',
+    pointerEvents: 'none'
   },
   homeTitle: {
     fontSize: "20px",
@@ -190,7 +202,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-around',
     color: 'white',
     fontSize: '14px',
-    marginTop: '5px'
+    marginTop: '5px',
+    position: 'relative'
   },
   statValue: {
     color: '#00f0ff',
@@ -220,6 +233,19 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #00f0ff',
     cursor: 'pointer',
     fontSize: '14px'
+  },
+  badge: {
+    backgroundColor: '#00f0ff',
+    color: '#0a0e27',
+    fontSize: '10px',
+    padding: '2px 6px',
+    position: 'absolute',
+    top: '-10px',
+    right: '0px',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 10px #00f0ff',
+    zIndex: 10
   },
   gameContainer: {
     width: '100%',
@@ -876,7 +902,14 @@ const DeflectGame: React.FC = () => {
         setPvpState(data);
 
         if (data.type === 'threat_spawn') {
-          setThreats(prev => [...prev, { ...data.threat, progress: 0 }]);
+          const colors = ['#ff006e', '#00f0ff', '#ffd700', '#ff4d00', '#00ff00', '#b829ff'];
+          const shapes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon'] as const;
+          setThreats(prev => [...prev, { 
+            ...data.threat, 
+            progress: 0,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            shape: shapes[Math.floor(Math.random() * shapes.length)]
+          }]);
         }
         if (data.type === 'score_update') {
           console.log('Score Update:', data);
@@ -1269,8 +1302,8 @@ const DeflectGame: React.FC = () => {
       };
       const pos = positions[direction];
       
-      const color = absorb ? '#00ff00' : '#00f0ff';
-      createParticles(pos.x, pos.y, color);
+      const particleColor = absorb ? '#00ff00' : threat.color;
+      createParticles(pos.x, pos.y, particleColor);
 
       if (isPerfect) {
         setPerfectFlash(true);
@@ -1321,10 +1354,15 @@ const DeflectGame: React.FC = () => {
         const directions: Direction[] = ['up', 'down', 'left', 'right'];
         const direction = directions[Math.floor(Math.random() * directions.length)];
         
+        const colors = ['#ff006e', '#00f0ff', '#ffd700', '#ff4d00', '#00ff00', '#b829ff'];
+        const shapes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon'] as const;
+        
         setThreats(prev => [...prev, {
           id: threatIdRef.current++,
           direction,
-          progress: 0
+          progress: 0,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          shape: shapes[Math.floor(Math.random() * shapes.length)]
         }]);
         
         lastSpawnRef.current = now;
@@ -1455,7 +1493,7 @@ const DeflectGame: React.FC = () => {
     <div style={styles.loadingScreen}>
       {/* Fallback text if image missing */}
       {/* <img src={`${API_BASE}/assets/images/logo.png`} alt="deflect.fun" style={styles.loadingLogo} /> */}
-      <h1 style={{...styles.homeTitle, fontSize: '3rem'}}>deflect.fun</h1>
+      <h1 style={{...styles.homeTitle, fontSize: '20px'}}>deflect.fun</h1>
       <div style={styles.loadingBar}>
         <div style={{ ...styles.loadingProgress, width: `${loadingProgress}%` }} />
       </div>
@@ -1466,6 +1504,10 @@ const DeflectGame: React.FC = () => {
   const renderHome = () => (
     <div style={styles.homeScreen}>
       <div style={styles.glassCard}>
+        <div style={{...styles.cornerBracket, top: '-2px', left: '-2px', borderTopWidth: '3px', borderLeftWidth: '3px'}} />
+        <div style={{...styles.cornerBracket, top: '-2px', right: '-2px', borderTopWidth: '3px', borderRightWidth: '3px'}} />
+        <div style={{...styles.cornerBracket, bottom: '-2px', left: '-2px', borderBottomWidth: '3px', borderLeftWidth: '3px'}} />
+        <div style={{...styles.cornerBracket, bottom: '-2px', right: '-2px', borderBottomWidth: '3px', borderRightWidth: '3px'}} />
         <h1 style={styles.homeTitle}>deflect.fun</h1>
         <p style={styles.homeSubtitle}>Swipe to survive. Collect powerups. Dominate.</p>
         
@@ -1480,10 +1522,13 @@ const DeflectGame: React.FC = () => {
                 <button style={{...styles.homeButton, flex: 1}} onClick={startGame}>PLAY SOLO</button>
                 <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => setScreen('pvp')}>PLAY PVP</button>
               </div>
-              <button style={{...styles.homeButton, ...styles.secondaryButton, width: '100%'}} onClick={() => {
+              <div style={{ position: 'relative', width: '100%' }}>
+                <span style={styles.badge}>{timeRemaining}</span>
+                <button style={{...styles.homeButton, ...styles.secondaryButton, width: '100%'}} onClick={() => {
                   fetchLeaderboard();
                   setScreen('leaderboard');
                 }}>LEADERBOARD</button>
+              </div>
               <div style={styles.buttonRow}>
                 <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => setScreen('store')}>STORE</button>
                 <button style={{...styles.homeButton, ...styles.secondaryButton, flex: 1}} onClick={() => setScreen('credits')}>{isMobile ? 'CRD' : 'CREDITS'}</button>
@@ -1492,6 +1537,10 @@ const DeflectGame: React.FC = () => {
             
             {userData && userData.highScore > 0 && (
               <div style={styles.statsCard}>
+                <div style={{...styles.cornerBracket, top: '-2px', left: '-2px', borderTopWidth: '3px', borderLeftWidth: '3px'}} />
+                <div style={{...styles.cornerBracket, top: '-2px', right: '-2px', borderTopWidth: '3px', borderRightWidth: '3px'}} />
+                <div style={{...styles.cornerBracket, bottom: '-2px', left: '-2px', borderBottomWidth: '3px', borderLeftWidth: '3px'}} />
+                <div style={{...styles.cornerBracket, bottom: '-2px', right: '-2px', borderBottomWidth: '3px', borderRightWidth: '3px'}} />
                 <div>High Score: <span style={styles.statValue}>{userData.highScore}</span></div>
                 <div>Games Played: <span style={styles.statValue}>{userData.totalGames}</span></div>
               </div>
@@ -1503,13 +1552,6 @@ const DeflectGame: React.FC = () => {
           <p style={styles.connectPrompt}>Connect wallet to play</p>
         )}
 
-        <div style={styles.countdownSection}>
-          <h3 style={styles.countdownTitle}>Season 1 Ends In:</h3>
-          <p style={styles.countdownTimer}>{timeRemaining}</p>
-          <button style={styles.learnMoreButton} onClick={() => setIsAirdropModalOpen(true)}>
-            Learn More
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1527,6 +1569,10 @@ const DeflectGame: React.FC = () => {
           onTouchEnd={handleTouchEnd}
           onClick={handleScreenTap}
         >
+          <div style={{...styles.cornerBracket, top: '-2px', left: '-2px', borderTopWidth: '3px', borderLeftWidth: '3px'}} />
+          <div style={{...styles.cornerBracket, top: '-2px', right: '-2px', borderTopWidth: '3px', borderRightWidth: '3px'}} />
+          <div style={{...styles.cornerBracket, bottom: '-2px', left: '-2px', borderBottomWidth: '3px', borderLeftWidth: '3px'}} />
+          <div style={{...styles.cornerBracket, bottom: '-2px', right: '-2px', borderBottomWidth: '3px', borderRightWidth: '3px'}} />
           <div style={{
             ...styles.player,
             left: `${characterPosition.x}%`,
@@ -1557,12 +1603,27 @@ const DeflectGame: React.FC = () => {
               right: { left: `${100 - threat.progress * 50}%`, top: '50%' }
             };
 
+            const getShapeClip = (shape: string) => {
+              switch (shape) {
+                case 'square': return 'none';
+                case 'triangle': return 'polygon(50% 0%, 0% 100%, 100% 100%)';
+                case 'pentagon': return 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)';
+                case 'hexagon': return 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+                case 'octagon': return 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)';
+                default: return 'none'; // circle handled by borderRadius
+              }
+            };
+
             return (
               <div
                 key={threat.id}
                 style={{
                   ...styles.threat,
                   ...positions[threat.direction],
+                  backgroundColor: threat.color,
+                  boxShadow: `0 0 20px ${threat.color}`,
+                  borderRadius: threat.shape === 'circle' ? '50%' : '0',
+                  clipPath: getShapeClip(threat.shape),
                   transform: 'translate(-50%, -50%)',
                   opacity: slowMo ? 0.5 : 1
                 }}
@@ -1949,6 +2010,14 @@ const DeflectGame: React.FC = () => {
       <button style={styles.backButton} onClick={() => setScreen('home')}>← BACK</button>
 
       <div style={styles.glassCard}>
+        <div style={{ ...styles.countdownSection, borderTop: 'none', marginTop: 0, paddingTop: 0, paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <h3 style={styles.countdownTitle}>Season 1 Ends In:</h3>
+          <p style={styles.countdownTimer}>{timeRemaining}</p>
+          <button style={styles.learnMoreButton} onClick={() => setIsAirdropModalOpen(true)}>
+            Learn More
+          </button>
+        </div>
+
         <h2 style={{ ...styles.sectionTitle, fontSize: '18px' }}>LEADERBOARD</h2>
 
 
