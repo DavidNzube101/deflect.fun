@@ -934,6 +934,18 @@ const DeflectGame: React.FC = () => {
             }
           }
         }
+
+        if (data.type === 'opponent_disconnected') {
+          showNotification('Opponent disconnected! You win!', 'success');
+          // Optionally set state to gameover if the server doesn't send a game_end
+          // But usually server sends game_end with winner. 
+          // If not, we force a return to home after a delay or show a specific screen.
+          // For now, let's assume we just notify and maybe go home or wait for game_end.
+          // Actually, let's force a "Opponent Left" screen if we don't get a game_end.
+          // But reusing game_end logic is better if the server sends it.
+          // If the server just sends this, we can treat it as a win.
+          setPvpState(prev => ({ ...prev, type: 'game_end', winner: publicKey?.toString() }));
+        }
       };
 
       ws.onerror = (error) => {
@@ -944,7 +956,9 @@ const DeflectGame: React.FC = () => {
 
       ws.onclose = (event) => {
         console.log('PVP WebSocket connection closed.', event);
-        showNotification('Disconnected from PvP.', 'info');
+        if (event.code !== 1000) { // 1000 is normal closure
+             showNotification('Connection lost.', 'error');
+        }
         setPvpSocket(null);
         setPvpState(null);
         setScreen('home');
@@ -1286,11 +1300,15 @@ const DeflectGame: React.FC = () => {
 
   const deflect = (direction: Direction) => {
     if (screen === 'pvp' && pvpSocket) {
-      pvpSocket.send(JSON.stringify({ type: 'action', payload: { direction } }));
-      
       const threat = threats.find(t => t.direction === direction && t.progress > 0.6);
       if (threat) {
-        setScore(prev => prev + 10); // Optimistic score increase
+        pvpSocket.send(JSON.stringify({ 
+          type: 'deflect', 
+          threatId: threat.id, 
+          isPerfect: threat.progress > 0.85 
+        }));
+        
+        setScore(prev => prev + (threat.progress > 0.85 ? 15 : 10)); // Optimistic score increase
         setThreats(prev => prev.filter(t => t.id !== threat.id));
         setShake(5);
         setTimeout(() => setShake(0), 100);
@@ -1436,6 +1454,10 @@ const DeflectGame: React.FC = () => {
           } else {
             if (screen === 'game') {
               gameOver();
+            } else if (screen === 'pvp' && pvpSocket) {
+              pvpSocket.send(JSON.stringify({ type: 'death' }));
+              vibrate(500);
+              playAudio('lose-soundtrack');
             }
             return updated.filter(t => t.id !== missed.id);
           }
