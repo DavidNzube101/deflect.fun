@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* 
+  Global styles are minimal as the entire game style is self-contained 
+  within src/app/page.tsx (Index.tsx) to meet submission requirements.
+*/
+:root {
+  --background: #0a0e27;
+  --foreground: #ffffff;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--foreground);
+  overflow: hidden; /* Prevent scrolling on body */
+}
